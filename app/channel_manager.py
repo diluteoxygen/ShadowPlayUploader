@@ -165,22 +165,20 @@ class ChannelManager:
         Returns:
             List of available channels
         """
+        logger.debug("[ChannelManager] discover_channels called. About to authenticate and get service.")
         try:
-            # Use a simple authentication approach that doesn't require a pre-selected channel
             youtube = self._authenticate_and_get_service()
-            
-            # Get channels
+            logger.debug("[ChannelManager] Got YouTube service, requesting channel list.")
             response = youtube.channels().list(
                 part="snippet,statistics,brandingSettings",
                 mine=True
             ).execute()
-            
+            logger.debug(f"[ChannelManager] Channel list response: {response}")
             channels = []
             for item in response.get('items', []):
                 snippet = item.get('snippet', {})
                 statistics = item.get('statistics', {})
                 branding = item.get('brandingSettings', {})
-                
                 channel_info = ChannelInfo(
                     channel_id=item['id'],
                     channel_title=snippet.get('title', ''),
@@ -195,7 +193,6 @@ class ChannelManager:
                     is_brand_account=snippet.get('brandingSettings', {}).get('channel', {}).get('isDefaultBrandAccount', False),
                     thumbnail_url=snippet.get('thumbnails', {}).get('default', {}).get('url', '')
                 )
-                
                 channels.append(channel_info)
                 
                 # Add to internal storage
@@ -211,12 +208,11 @@ class ChannelManager:
             self._save_channels()
             self._save_settings()
             
-            logger.info(f"Discovered {len(channels)} channels")
+            logger.debug(f"[ChannelManager] Discovered and saved {len(channels)} channels.")
             return channels
-            
         except Exception as e:
-            logger.error(f"Failed to discover channels: {e}")
-            raise YouTubeAPIError(f"Failed to discover channels: {e}")
+            logger.error(f"[ChannelManager] Failed to discover channels: {e}")
+            raise
     
     def get_channel(self, channel_id: str) -> Optional[ChannelInfo]:
         """Get channel information by ID."""
@@ -267,7 +263,7 @@ class ChannelManager:
         return None
     
     def _authenticate_and_get_service(self):
-        """Get authenticated YouTube service without requiring a pre-selected channel."""
+        logger.debug("[ChannelManager] _authenticate_and_get_service called. This is where OAuth browser should launch if needed.")
         try:
             # Use the main token file for initial authentication
             token_file = config.get("api.token_file")

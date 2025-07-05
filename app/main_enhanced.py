@@ -2,8 +2,11 @@ import os
 import threading
 import ttkbootstrap as ttkb
 from ttkbootstrap.constants import *
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, ttk, Menu, Toplevel
 from typing import Optional, Dict, Any
+import requests
+from PIL import Image, ImageTk
+from io import BytesIO
 
 from .uploader_batch import start_batch_upload
 from .logger import get_logger
@@ -15,6 +18,209 @@ from .upload_presets import PresetManager, UploadPreset
 
 logger = get_logger()
 config = get_config()
+
+class ProfileDropdown:
+    """Profile dropdown component with channel logo and authentication controls."""
+    
+    def __init__(self, parent, channel_manager, on_auth_change):
+        self.parent = parent
+        self.channel_manager = channel_manager
+        self.on_auth_change = on_auth_change
+        self.dropdown_open = False
+        self.profile_photo = None
+        self.dropdown_logo_photo = None
+        self.dropdown_win = None
+        self.login_btn = None
+        self.logout_btn = None
+        self.refresh_btn = None
+        # Create profile button
+        self.profile_frame = ttkb.Frame(parent)
+        self.profile_frame.pack(side=RIGHT, padx=(10, 0))
+        self.profile_btn = ttkb.Button(
+            self.profile_frame, 
+            text="👤", 
+            bootstyle=SECONDARY,
+            width=3,
+            command=self._toggle_dropdown
+        )
+        self.profile_btn.pack(side=TOP)
+        # Show logo if available
+        self._update_profile_button_logo()
+    
+    def _toggle_dropdown(self):
+        if self.dropdown_open:
+            self._hide_dropdown()
+        else:
+            self._show_dropdown()
+    
+    def _show_dropdown(self):
+        if self.dropdown_open:
+            return
+        self.dropdown_win = Toplevel(self.parent)
+        self.dropdown_win.overrideredirect(True)
+        self.dropdown_win.attributes("-topmost", True)
+        self.dropdown_win.configure(bg="white")
+        x = self.profile_frame.winfo_rootx()
+        y = self.profile_frame.winfo_rooty() + self.profile_frame.winfo_height()
+        self.dropdown_win.geometry(f"220x180+{x}+{y}")
+        self.dropdown_open = True
+        self.dropdown_win.bind("<FocusOut>", lambda e: self._hide_dropdown())
+        self.dropdown_win.grab_set()
+        frame = ttkb.Frame(self.dropdown_win, padding=10)
+        frame.pack(fill=BOTH, expand=True)
+        self.status_label = ttkb.Label(
+            frame, 
+            text="Not authenticated", 
+            font=("Segoe UI", 9),
+            foreground="gray"
+        )
+        self.status_label.pack(pady=(0, 5), padx=0)
+        channel_info_frame = ttkb.Frame(frame)
+        channel_info_frame.pack(fill=X, padx=0, pady=5)
+        self.logo_label = ttkb.Label(channel_info_frame, text="")
+        self.logo_label.pack(side=LEFT, padx=(0, 10))
+        self.channel_name_label = ttkb.Label(
+            channel_info_frame, 
+            text="", 
+            font=("Segoe UI", 10, "bold")
+        )
+        self.channel_name_label.pack(side=LEFT, fill=X, expand=True)
+        buttons_frame = ttkb.Frame(frame)
+        buttons_frame.pack(fill=X, padx=0, pady=(5, 0))
+        self.login_btn = ttkb.Button(
+            buttons_frame,
+            text="🔑 Login",
+            bootstyle=SUCCESS
+        )
+        self.login_btn.pack(fill=X, pady=2)
+        
+        # Use bind instead of command for Toplevel windows
+        self.login_btn.bind("<Button-1>", lambda e: self._login())
+        self.logout_btn = ttkb.Button(
+            buttons_frame,
+            text="🚪 Logout",
+            bootstyle=DANGER,
+            state=DISABLED
+        )
+        self.logout_btn.pack(fill=X, pady=2)
+        self.logout_btn.bind("<Button-1>", lambda e: self._logout())
+        
+        self.refresh_btn = ttkb.Button(
+            buttons_frame,
+            text="🔄 Refresh",
+            bootstyle=INFO,
+            state=DISABLED
+        )
+        self.refresh_btn.pack(fill=X, pady=2)
+        self.refresh_btn.bind("<Button-1>", lambda e: self._refresh())
+        self._update_state()
+    
+    def _hide_dropdown(self):
+        if self.dropdown_open and self.dropdown_win:
+            self.dropdown_win.grab_release()
+            self.dropdown_win.destroy()
+            self.dropdown_win = None
+            self.dropdown_open = False
+            self.login_btn = None
+            self.logout_btn = None
+            self.refresh_btn = None
+    
+    def _login(self):
+        logger.debug("[ProfileDropdown] Login button clicked.")
+        
+        # Store the callback before hiding dropdown
+        callback = self.on_auth_change
+        
+        if callback:
+            logger.debug("[ProfileDropdown] Calling on_auth_change('login').")
+            callback("login")
+        else:
+            logger.error("[ProfileDropdown] on_auth_change callback is None!")
+        
+        # Hide dropdown after callback
+        self.dropdown_win.after(100, self._hide_dropdown)
+    
+    def _logout(self):
+        self._hide_dropdown()
+        if self.on_auth_change:
+            self.on_auth_change("logout")
+    
+    def _refresh(self):
+        self._hide_dropdown()
+        if self.on_auth_change:
+            self.on_auth_change("refresh")
+    
+    def _load_profile_image(self, url: str):
+        try:
+            response = requests.get(url, timeout=5)
+            response.raise_for_status()
+            image = Image.open(BytesIO(response.content)).convert("RGBA")
+            image = image.resize((32, 32), Image.Resampling.LANCZOS)
+            self.profile_photo = ImageTk.PhotoImage(image)
+            self.dropdown_logo_photo = ImageTk.PhotoImage(image)
+            self.profile_btn.configure(image=self.profile_photo, text="")
+            
+            # Only update logo_label if dropdown is open and widget exists
+            if hasattr(self, 'logo_label') and self.dropdown_open and self.logo_label.winfo_exists():
+                try:
+                    self.logo_label.configure(image=self.dropdown_logo_photo, text="")
+                except Exception as e:
+                    logger.debug(f"Could not update logo_label: {e}")
+                    
+        except Exception as e:
+            logger.warning(f"Failed to load profile image: {e}")
+            self.profile_btn.configure(image="", text="👤")
+            
+            # Only update logo_label if dropdown is open and widget exists
+            if hasattr(self, 'logo_label') and self.dropdown_open and self.logo_label.winfo_exists():
+                try:
+                    self.logo_label.configure(image="", text="👤")
+                except Exception as e:
+                    logger.debug(f"Could not update logo_label: {e}")
+    
+    def _update_profile_button_logo(self):
+        active_channel = self.channel_manager.get_active_channel()
+        if active_channel and active_channel.thumbnail_url:
+            self._load_profile_image(active_channel.thumbnail_url)
+        else:
+            self.profile_btn.configure(image="", text="👤")
+    
+    def _update_state(self):
+        active_channel = self.channel_manager.get_active_channel()
+        if active_channel:
+            self.status_label.configure(text="Authenticated", foreground="green")
+            self.channel_name_label.configure(text=active_channel.channel_title)
+            if active_channel.thumbnail_url:
+                self._load_profile_image(active_channel.thumbnail_url)
+            else:
+                self.profile_btn.configure(image="", text="👤")
+                # Only update logo_label if dropdown is open and widget exists
+                if hasattr(self, 'logo_label') and self.dropdown_open and self.logo_label.winfo_exists():
+                    try:
+                        self.logo_label.configure(image="", text="👤")
+                    except Exception as e:
+                        logger.debug(f"Could not update logo_label: {e}")
+            self.login_btn.configure(state=DISABLED)
+            self.logout_btn.configure(state=NORMAL)
+            self.refresh_btn.configure(state=NORMAL)
+        else:
+            self.status_label.configure(text="Not authenticated", foreground="gray")
+            self.channel_name_label.configure(text="")
+            self.profile_btn.configure(image="", text="👤")
+            # Only update logo_label if dropdown is open and widget exists
+            if hasattr(self, 'logo_label') and self.dropdown_open and self.logo_label.winfo_exists():
+                try:
+                    self.logo_label.configure(image="", text="👤")
+                except Exception as e:
+                    logger.debug(f"Could not update logo_label: {e}")
+            self.login_btn.configure(state=NORMAL)
+            self.logout_btn.configure(state=DISABLED)
+            self.refresh_btn.configure(state=DISABLED)
+    
+    def update_display(self):
+        self._update_profile_button_logo()
+        if self.dropdown_open:
+            self._update_state()
 
 class EnhancedShadowPlayUploader:
     """Enhanced GUI with queue management, multiple channels, and presets."""
@@ -73,35 +279,30 @@ class EnhancedShadowPlayUploader:
         main_frame = ttkb.Frame(self.app, padding=10)
         main_frame.pack(fill=BOTH, expand=True)
         
-        # Authentication section
-        auth_frame = ttkb.LabelFrame(main_frame, text="🔐 Authentication & Channel", padding=10)
-        auth_frame.pack(fill=X, pady=(0, 10))
+        # Header with profile dropdown
+        header_frame = ttkb.Frame(main_frame)
+        header_frame.pack(fill=X, pady=(0, 10))
         
-        # Authentication status and login
-        auth_status_frame = ttkb.Frame(auth_frame)
-        auth_status_frame.pack(fill=X, pady=(0, 10))
+        # Title
+        title_label = ttkb.Label(
+            header_frame, 
+            text="ShadowPlay Batch Uploader", 
+            font=("Segoe UI", 16, "bold")
+        )
+        title_label.pack(side=LEFT)
         
-        # Status label
-        self.auth_status_var = ttkb.StringVar(value="Not authenticated")
-        self.auth_status_label = ttkb.Label(auth_status_frame, textvariable=self.auth_status_var, 
-                                           font=("Segoe UI", 9))
-        self.auth_status_label.pack(side=LEFT, padx=(0, 10))
-        
-        # Login/Logout button
-        self.auth_btn = ttkb.Button(auth_status_frame, text="🔑 Login", bootstyle=SUCCESS, 
-                                   command=self._authenticate_user)
-        self.auth_btn.pack(side=LEFT, padx=(0, 10))
-        
-        # Refresh channels button
-        self.refresh_btn = ttkb.Button(auth_status_frame, text="🔄 Refresh Channels", bootstyle=INFO, 
-                                     command=self._refresh_channels, state=DISABLED)
-        self.refresh_btn.pack(side=LEFT)
+        # Profile dropdown
+        self.profile_dropdown = ProfileDropdown(
+            header_frame, 
+            self.channel_manager, 
+            self._on_auth_action
+        )
         
         # Channel selector
-        channel_frame = ttkb.Frame(auth_frame)
+        channel_frame = ttkb.LabelFrame(main_frame, text="📺 YouTube Channel", padding=10)
         channel_frame.pack(fill=X, pady=(0, 10))
         
-        ttkb.Label(channel_frame, text="YouTube Channel:").pack(anchor=W)
+        ttkb.Label(channel_frame, text="Select Channel:").pack(anchor=W)
         self.channel_combobox = ttkb.Combobox(channel_frame, textvariable=self.channel_var, state="readonly")
         self.channel_combobox.pack(fill=X, pady=2)
         
@@ -199,113 +400,130 @@ class EnhancedShadowPlayUploader:
         queue_frame = ttkb.LabelFrame(main_frame, text="Upload Queue", padding=10)
         queue_frame.pack(fill=BOTH, expand=True, pady=(0, 10))
         
+        # Queue controls
+        queue_controls = ttkb.Frame(queue_frame)
+        queue_controls.pack(fill=X, pady=(0, 10))
+        
+        ttkb.Button(queue_controls, text="Clear Completed", bootstyle=SECONDARY,
+                   command=self._clear_completed).pack(side=LEFT, padx=(0, 10))
+        
+        ttkb.Button(queue_controls, text="Pause Selected", bootstyle=WARNING,
+                   command=self._pause_selected).pack(side=LEFT, padx=(0, 10))
+        
+        ttkb.Button(queue_controls, text="Resume Selected", bootstyle=SUCCESS,
+                   command=self._resume_selected).pack(side=LEFT, padx=(0, 10))
+        
+        ttkb.Button(queue_controls, text="Cancel Selected", bootstyle=DANGER,
+                   command=self._cancel_selected).pack(side=LEFT)
+        
         # Queue treeview
-        self.queue_tree = ttk.Treeview(queue_frame, columns=("Status", "Progress", "Size"), 
-                                      show="tree headings", height=8)
-        self.queue_tree.heading("#0", text="File Name")
+        columns = ("File", "Status", "Progress", "Size")
+        self.queue_tree = ttkb.Treeview(queue_frame, columns=columns, show="headings", height=8)
+        
+        # Configure columns
+        self.queue_tree.heading("File", text="File")
         self.queue_tree.heading("Status", text="Status")
         self.queue_tree.heading("Progress", text="Progress")
         self.queue_tree.heading("Size", text="Size")
         
-        self.queue_tree.column("#0", width=300)
-        self.queue_tree.column("Status", width=100)
-        self.queue_tree.column("Progress", width=100)
-        self.queue_tree.column("Size", width=100)
+        self.queue_tree.column("File", width=300, anchor=W)
+        self.queue_tree.column("Status", width=100, anchor=CENTER)
+        self.queue_tree.column("Progress", width=100, anchor=CENTER)
+        self.queue_tree.column("Size", width=80, anchor=E)
         
-        # Scrollbar for queue
-        queue_scrollbar = ttk.Scrollbar(queue_frame, orient=VERTICAL, command=self.queue_tree.yview)
+        # Scrollbar
+        queue_scrollbar = ttkb.Scrollbar(queue_frame, orient=VERTICAL, command=self.queue_tree.yview)
         self.queue_tree.configure(yscrollcommand=queue_scrollbar.set)
         
         self.queue_tree.pack(side=LEFT, fill=BOTH, expand=True)
         queue_scrollbar.pack(side=RIGHT, fill=Y)
         
-        # Queue control buttons
-        queue_control_frame = ttkb.Frame(queue_frame)
-        queue_control_frame.pack(fill=X, pady=(10, 0))
+        # Context menu for queue
+        self.queue_context_menu = Menu(self.app, tearoff=0)
+        self.queue_context_menu.add_command(label="Pause", command=self._pause_selected)
+        self.queue_context_menu.add_command(label="Resume", command=self._resume_selected)
+        self.queue_context_menu.add_command(label="Cancel", command=self._cancel_selected)
+        self.queue_context_menu.add_separator()
+        self.queue_context_menu.add_command(label="Remove from Queue", command=self._remove_selected)
         
-        ttkb.Button(queue_control_frame, text="Pause Selected", bootstyle=WARNING, 
-                   command=self._pause_selected).pack(side=LEFT, padx=(0, 5))
-        
-        ttkb.Button(queue_control_frame, text="Resume Selected", bootstyle=SUCCESS, 
-                   command=self._resume_selected).pack(side=LEFT, padx=(0, 5))
-        
-        ttkb.Button(queue_control_frame, text="Cancel Selected", bootstyle=DANGER, 
-                   command=self._cancel_selected).pack(side=LEFT, padx=(0, 5))
-        
-        ttkb.Button(queue_control_frame, text="Clear Completed", bootstyle=SECONDARY, 
-                   command=self._clear_completed).pack(side=LEFT)
+        self.queue_tree.bind("<Button-3>", self._show_queue_context_menu)
         
         # Log section
-        log_frame = ttkb.LabelFrame(main_frame, text="Upload Logs", padding=10)
+        log_frame = ttkb.LabelFrame(main_frame, text="Logs", padding=10)
         log_frame.pack(fill=BOTH, expand=True)
         
-        self.log_box = ttkb.Text(log_frame, height=10, width=85)
-        self.log_box.pack(expand=True, fill=BOTH)
+        # Log text widget
+        self.log_box = ttkb.Text(log_frame, height=6, wrap=WORD)
+        log_scrollbar = ttkb.Scrollbar(log_frame, orient=VERTICAL, command=self.log_box.yview)
+        self.log_box.configure(yscrollcommand=log_scrollbar.set)
+        
+        self.log_box.pack(side=LEFT, fill=BOTH, expand=True)
+        log_scrollbar.pack(side=RIGHT, fill=Y)
+    
+    def _on_auth_action(self, action: str):
+        logger.debug(f"[EnhancedShadowPlayUploader] _on_auth_action called with action: {action}")
+        if action == "login":
+            self._authenticate_user()
+        elif action == "logout":
+            self._logout_user()
+        elif action == "refresh":
+            self._refresh_channels()
     
     def _setup_channel_selector(self):
         """Set up the channel selector combobox."""
-        try:
-            # Get available channels
-            channels = self.channel_manager.get_all_channels()
+        channels = self.channel_manager.get_all_channels()
+        
+        # Clear existing items
+        self.channel_combobox['values'] = []
+        
+        if channels:
+            # Add channels to combobox
+            channel_names = [f"{channel.channel_title} ({channel.channel_id})" for channel in channels]
+            self.channel_combobox['values'] = channel_names
             
-            if channels:
-                # Populate combobox
-                channel_names = [f"{ch.channel_title} ({ch.channel_id})" for ch in channels]
-                self.channel_combobox['values'] = channel_names
-                
-                # Set active channel
-                active_channel = self.channel_manager.get_active_channel()
-                if active_channel:
-                    active_name = f"{active_channel.channel_title} ({active_channel.channel_id})"
+            # Select active channel if available
+            active_channel = self.channel_manager.get_active_channel()
+            if active_channel:
+                active_name = f"{active_channel.channel_title} ({active_channel.channel_id})"
+                if active_name in channel_names:
+                    self.channel_combobox.set(active_name)
                     self.channel_var.set(active_name)
-                elif channels:
-                    # Set first channel as active if none selected
-                    self.channel_manager.set_active_channel(channels[0].channel_id)
-                    first_name = f"{channels[0].channel_title} ({channels[0].channel_id})"
-                    self.channel_var.set(first_name)
-                
-                # Bind selection change
-                self.channel_combobox.bind('<<ComboboxSelected>>', self._on_channel_changed)
-                
-                logger.info(f"Channel selector set up with {len(channels)} channels")
-            else:
-                # No channels available
-                self.channel_combobox['values'] = []
-                self.channel_var.set("")
-                logger.info("No channels available for selection")
             
-        except Exception as e:
-            logger.error(f"Failed to setup channel selector: {e}")
-            self.channel_combobox['values'] = []
-            self.channel_var.set("")
+            # Bind selection change
+            self.channel_combobox.bind("<<ComboboxSelected>>", self._on_channel_changed)
+            
+            logger.info(f"Loaded {len(channels)} channels into selector")
+        else:
+            logger.info("No channels available")
     
     def _setup_preset_selector(self):
         """Set up the preset selector combobox."""
-        try:
-            # Get all presets
-            presets = self.preset_manager.get_all_presets()
+        presets = self.preset_manager.get_all_presets()
+        
+        # Clear existing items
+        self.preset_combobox['values'] = []
+        
+        if presets:
+            # Add presets to combobox
             preset_names = [preset.name for preset in presets]
-            
             self.preset_combobox['values'] = preset_names
             
-            # Set default preset
-            default_preset = self.preset_manager.get_default_preset()
-            if default_preset:
-                self.preset_var.set(default_preset.name)
+            # Select first preset if available
+            if preset_names:
+                self.preset_combobox.set(preset_names[0])
+                self.preset_var.set(preset_names[0])
             
             # Bind selection change
-            self.preset_combobox.bind('<<ComboboxSelected>>', self._on_preset_changed)
+            self.preset_combobox.bind("<<ComboboxSelected>>", self._on_preset_changed)
             
-        except Exception as e:
-            logger.error(f"Failed to setup preset selector: {e}")
+            logger.info(f"Loaded {len(presets)} presets into selector")
+        else:
+            logger.info("No presets available")
     
     def _setup_queue_display(self):
-        """Set up the queue display."""
-        # Bind right-click menu
-        self.queue_tree.bind("<Button-3>", self._show_queue_context_menu)
-        
-        # Update queue display periodically
-        self._update_queue_display()
+        """Set up the upload queue display."""
+        # This is already done in _create_gui
+        pass
     
     def _browse_folder(self):
         """Browse for folder selection."""
@@ -441,6 +659,15 @@ class EnhancedShadowPlayUploader:
                 # This would need to be implemented with the queue system
                 pass
     
+    def _remove_selected(self):
+        """Remove selected uploads from queue."""
+        selected_items = self.queue_tree.selection()
+        if selected_items and messagebox.askyesno("Remove Selected", "Remove selected uploads from queue?"):
+            for item_id in selected_items:
+                # Get upload item and remove it
+                # This would need to be implemented with the queue system
+                pass
+    
     def _clear_completed(self):
         """Clear completed uploads from queue display."""
         self.upload_queue.clear_completed()
@@ -494,52 +721,40 @@ class EnhancedShadowPlayUploader:
             channels = self.channel_manager.get_all_channels()
             if channels:
                 # User is authenticated
-                self.auth_status_var.set("✅ Authenticated")
-                self.auth_btn.config(text="🔓 Logout", bootstyle=DANGER)
-                self.refresh_btn.config(state=NORMAL)
+                self.profile_dropdown.update_display()
                 self._setup_channel_selector()
                 logger.info("User is authenticated")
             else:
                 # User is not authenticated
-                self.auth_status_var.set("❌ Not authenticated")
-                self.auth_btn.config(text="🔑 Login", bootstyle=SUCCESS)
-                self.refresh_btn.config(state=DISABLED)
+                self.profile_dropdown.update_display()
                 self.channel_combobox['values'] = []
                 self.channel_var.set("")
                 logger.info("User is not authenticated")
         except Exception as e:
             logger.error(f"Error checking auth status: {e}")
-            self.auth_status_var.set("❌ Authentication error")
+            self.profile_dropdown.update_display()
     
     def _authenticate_user(self):
-        """Handle user authentication/login."""
+        logger.debug("[EnhancedShadowPlayUploader] _authenticate_user called.")
         try:
-            if self.auth_btn.cget("text") == "🔑 Login":
-                # User wants to login
+            active_channel = self.channel_manager.get_active_channel()
+            if active_channel:
+                logger.debug("[EnhancedShadowPlayUploader] User is already authenticated, logging out.")
+                self._logout_user()
+            else:
                 logger.info("Starting authentication process...")
-                self.auth_status_var.set("🔄 Authenticating...")
-                self.auth_btn.config(state=DISABLED)
-                
-                # Start authentication in a separate thread
+                self.profile_dropdown.update_display()
                 def auth_thread():
+                    logger.debug("[EnhancedShadowPlayUploader] Starting OAuth thread for authentication.")
                     try:
-                        # Try to discover channels (this will trigger OAuth if needed)
                         channels = self.channel_manager.discover_channels()
                         if channels:
-                            # Authentication successful
                             self.app.after(0, lambda: self._auth_success(channels))
                         else:
-                            # Authentication failed
                             self.app.after(0, lambda: self._auth_failed("No channels found"))
                     except Exception as auth_error:
                         self.app.after(0, lambda err=auth_error: self._auth_failed(str(err)))
-                
                 threading.Thread(target=auth_thread, daemon=True).start()
-                
-            else:
-                # User wants to logout
-                self._logout_user()
-                
         except Exception as e:
             logger.error(f"Authentication error: {e}")
             self._auth_failed(str(e))
@@ -547,22 +762,25 @@ class EnhancedShadowPlayUploader:
     def _auth_success(self, channels):
         """Handle successful authentication."""
         try:
-            self.auth_status_var.set("✅ Authenticated")
-            self.auth_btn.config(text="🔓 Logout", bootstyle=DANGER, state=NORMAL)
-            self.refresh_btn.config(state=NORMAL)
-            
-            # Set up channel selector
-            self._setup_channel_selector()
+            logger.info(f"Authentication successful. Found {len(channels)} channels.")
             
             # Set first channel as active if none selected
-            if not self.channel_var.get() and channels:
+            if channels:
                 first_channel = channels[0]
                 self.channel_manager.set_active_channel(first_channel.channel_id)
                 channel_name = f"{first_channel.channel_title} ({first_channel.channel_id})"
                 self.channel_var.set(channel_name)
             
-            logger.info(f"Authentication successful. Found {len(channels)} channels.")
+            # Update UI components
+            self.profile_dropdown.update_display()
+            self._setup_channel_selector()
+            
+            # Show success message
             messagebox.showinfo("Success", f"Authentication successful!\nFound {len(channels)} YouTube channel(s).")
+            
+            # Re-open dropdown to show updated state
+            if not self.profile_dropdown.dropdown_open:
+                self.profile_dropdown._show_dropdown()
             
         except Exception as e:
             logger.error(f"Error in auth success: {e}")
@@ -570,9 +788,7 @@ class EnhancedShadowPlayUploader:
     
     def _auth_failed(self, error_msg):
         """Handle failed authentication."""
-        self.auth_status_var.set("❌ Authentication failed")
-        self.auth_btn.config(text="🔑 Login", bootstyle=SUCCESS, state=NORMAL)
-        self.refresh_btn.config(state=DISABLED)
+        self.profile_dropdown.update_display()
         logger.error(f"Authentication failed: {error_msg}")
         messagebox.showerror("Authentication Failed", f"Failed to authenticate:\n{error_msg}")
     
@@ -585,9 +801,7 @@ class EnhancedShadowPlayUploader:
             self.channel_manager.active_channel_id = None
             
             # Update UI
-            self.auth_status_var.set("❌ Not authenticated")
-            self.auth_btn.config(text="🔑 Login", bootstyle=SUCCESS)
-            self.refresh_btn.config(state=DISABLED)
+            self.profile_dropdown.update_display()
             self.channel_combobox['values'] = []
             self.channel_var.set("")
             
@@ -601,7 +815,7 @@ class EnhancedShadowPlayUploader:
         """Refresh the list of available channels."""
         try:
             logger.info("Refreshing channels...")
-            self.refresh_btn.config(state=DISABLED)
+            self.profile_dropdown.update_display()
             
             def refresh_thread():
                 try:
@@ -614,22 +828,21 @@ class EnhancedShadowPlayUploader:
             
         except Exception as e:
             logger.error(f"Error refreshing channels: {e}")
-            self.refresh_btn.config(state=NORMAL)
+            self.profile_dropdown.update_display()
     
     def _refresh_success(self, channels):
         """Handle successful channel refresh."""
         try:
             self._setup_channel_selector()
-            self.refresh_btn.config(state=NORMAL)
             logger.info(f"Refreshed {len(channels)} channels")
             messagebox.showinfo("Success", f"Refreshed {len(channels)} channels.")
         except Exception as e:
             logger.error(f"Error in refresh success: {e}")
-            self.refresh_btn.config(state=NORMAL)
+            self.profile_dropdown.update_display()
     
     def _refresh_failed(self, error_msg):
         """Handle failed channel refresh."""
-        self.refresh_btn.config(state=NORMAL)
+        self.profile_dropdown.update_display()
         logger.error(f"Channel refresh failed: {error_msg}")
         messagebox.showerror("Refresh Failed", f"Failed to refresh channels:\n{error_msg}")
     
