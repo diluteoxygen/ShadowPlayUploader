@@ -1,10 +1,13 @@
 # ShadowPlay Batch Uploader 🎮📤
 
-A minimal, modern Python desktop app that automatically uploads your NVIDIA ShadowPlay gameplay clips to a selected **YouTube Brand Channel**, with features like:
-- Real-time upload progress (with % and MBs),
-- Automatic deletion after upload (optional),
-- Duplicate video detection using hashing,
-- Clean and user-friendly GUI inspired by Apple’s design principles.
+A modern Python desktop app to automatically upload your NVIDIA ShadowPlay gameplay clips to a selected **YouTube Brand Channel**. Now with:
+- Real-time upload progress (with % and MBs)
+- Automatic deletion after upload (optional)
+- Duplicate video detection using hashing
+- **Upload queue management** (pause/resume/cancel/reorder)
+- **Multiple YouTube channel support**
+- **Upload presets & description templates**
+- Clean, user-friendly GUI (ttkbootstrap)
 
 ---
 
@@ -16,6 +19,9 @@ A minimal, modern Python desktop app that automatically uploads your NVIDIA Shad
 - 🧠 **Duplicate Detection**: Uses file hashing to skip already uploaded clips.
 - 🗑️ **Auto Delete**: Optionally deletes video after upload.
 - 🌙 **Dark Mode**: Toggle between light and dark themes.
+- 🕹️ **Upload Queue**: Pause, resume, cancel, and reorder uploads.
+- 👥 **Multiple Channels**: Manage and upload to multiple YouTube channels.
+- 📝 **Presets & Templates**: Save upload settings and description templates for reuse.
 
 ---
 
@@ -23,12 +29,25 @@ A minimal, modern Python desktop app that automatically uploads your NVIDIA Shad
 
 ```
 ShadowPlayUploader/
-├── main.py                # GUI frontend (ttkbootstrap)
-├── uploader_batch.py      # Backend YouTube upload logic
-├── client_secrets.json    # Your Google OAuth credentials
-├── token.pickle           # Auth token (auto-generated)
-├── uploaded_hashes.txt    # Hashes of uploaded videos
-├── README.md              # This file
+├── app/                      # Main application code (GUI, logic, managers)
+│   ├── main_enhanced.py      # Enhanced GUI entry point
+│   ├── uploader_batch.py     # Backend YouTube upload logic
+│   ├── upload_queue.py       # Upload queue management
+│   ├── channel_manager.py    # Multiple channel support
+│   ├── upload_presets.py     # Presets & templates
+│   └── ...
+├── resources/                # Static config and template files
+│   ├── config.json           # App settings (safe defaults)
+│   ├── upload_presets.json   # Preset definitions
+│   ├── description_templates.json # Description templates
+│   └── client_secrets.json   # (NOT tracked) Google OAuth credentials
+├── tokens/                   # (NOT tracked) OAuth tokens
+├── tests/                    # Test scripts
+├── archive/                  # Old/legacy code
+├── main.py                   # Main entry point
+├── requirements.txt          # Python dependencies
+├── .gitignore                # Protects secrets/tokens
+├── README.md                 # This file
 ```
 
 ---
@@ -37,11 +56,11 @@ ShadowPlayUploader/
 
 1. **Create a Google Cloud Project**  
    - Enable YouTube Data API v3  
-   - Download `client_secrets.json`
+   - Download `client_secrets.json` and place it in `resources/` (never upload this file!)
 
 2. **Install dependencies**
 ```bash
-pip install google-auth google-auth-oauthlib google-api-python-client ttkbootstrap
+pip install -r requirements.txt
 ```
 
 3. **Run the app**
@@ -51,11 +70,23 @@ python main.py
 
 ---
 
-## 🛠 Settings
+## 🛠 Settings & Usage
 
 - **Auto-delete after upload**: Removes video after successful upload.
 - **Dark Mode**: Switch between light/dark themes from UI.
+- **Upload Queue**: Pause, resume, cancel, and reorder uploads.
+- **Multiple Channels**: Select and manage YouTube channels.
+- **Presets & Templates**: Save and reuse upload settings and descriptions.
 - **Hash logging**: Ensures same video is not uploaded multiple times.
+
+---
+
+## 🔒 Security & Version Control
+
+- **Sensitive files are protected by `.gitignore`**:
+  - `resources/client_secrets.json`, `tokens/`, `token.pickle`, and other secrets are NEVER tracked or uploaded.
+- **Safe defaults only** are included in `config.json`.
+- **Never share your OAuth credentials or tokens.**
 
 ---
 
@@ -68,11 +99,11 @@ Built for creators who want to:
 
 ---
 
-## ⚠️ Notes
+## 🤝 Contributing & Version Control
 
-- All clips must be `.mp4` and located in the selected folder.
-- Only uploads completed files (waits if a file is being written).
-- You must authorize the app once on first launch (OAuth consent screen).
+- All development is tracked in git and on GitHub.
+- Please fork, branch, and submit pull requests for improvements.
+- See `.gitignore` for files that must never be committed.
 
 ---
 
