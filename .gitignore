@@ -1,1 +1,31 @@
- 
+ # Sensitive files (NEVER commit these)
+resources/client_secrets.json
+resources/channels.json
+resources/channel_settings.json
+token.pickle
+tokens/
+
+# Uploaded hashes and logs
+uploaded_hashes.txt
+app.log
+*.log
+
+# Python cache and build
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+*.test
+
+# VSCode and IDE
+.vscode/
+.idea/
+
+# Archive (optional, if you want to keep it local only)
+archive/
