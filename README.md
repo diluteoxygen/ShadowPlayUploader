@@ -107,10 +107,4 @@ Built for creators who want to:
 
 ---
 
-## 🧠 Credits
 
-Created by **Dilute Oxygen**  
-- MCA Student, IET Lucknow  
-- Passionate about clean tooling, AI dev, and productivity hacks.
-
-MIT License.
