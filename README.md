@@ -109,6 +109,6 @@ Built for creators who want to:
 
 ## Activity Graph
 
-[![diluteoxygen's github activity graph](https://github-readme-activity-graph.vercel.app/graph?username=diluteoxygen&bg_color=22272e&color=adbac7&line=539bf5&point=539bf5&area=true&hide_border=true&theme=github-compact)](https://github.com/diluteoxygen/ShadowPlayUploader)
+![GitHub Activity Graph](https://github-readme-activity-graph.cyclic.app/graph?username=diluteoxygen&repo=ShadowPlayUploader&theme=github-compact)
 
 
