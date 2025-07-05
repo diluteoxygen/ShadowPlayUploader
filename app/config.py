@@ -46,7 +46,7 @@ class Config:
                 "https://www.googleapis.com/auth/youtube.upload",
                 "https://www.googleapis.com/auth/youtube.readonly"
             ],
-            "token_file": "token.pickle",
+            "token_file": "tokens/token_main.pickle",
             "client_secrets_file": "resources/client_secrets.json"
         },
         "paths": {

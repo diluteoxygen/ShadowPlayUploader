@@ -262,13 +262,34 @@ class ChannelManager:
             return self.channel_settings.get(self.active_channel_id)
         return None
     
+    def logout(self):
+        """Log out the user by deleting all token files and clearing state."""
+        # Delete all token files in tokens/
+        for fname in os.listdir(self.tokens_dir):
+            if fname.startswith("token_") and fname.endswith(".pickle"):
+                try:
+                    os.remove(os.path.join(self.tokens_dir, fname))
+                except Exception as e:
+                    logger.warning(f"Failed to delete token file {fname}: {e}")
+        # Also delete the main token file if it exists
+        main_token = config.get("api.token_file")
+        if os.path.exists(main_token):
+            try:
+                os.remove(main_token)
+            except Exception as e:
+                logger.warning(f"Failed to delete main token file: {e}")
+        # Clear in-memory state
+        self.channels.clear()
+        self.channel_settings.clear()
+        self.active_channel_id = None
+        self.credentials_cache.clear()
+    
     def _authenticate_and_get_service(self):
         logger.debug("[ChannelManager] _authenticate_and_get_service called. This is where OAuth browser should launch if needed.")
         try:
-            # Use the main token file for initial authentication
+            # Use the main token file in tokens/ for initial authentication
             token_file = config.get("api.token_file")
             creds = None
-            
             if os.path.exists(token_file):
                 try:
                     with open(token_file, 'rb') as token:
