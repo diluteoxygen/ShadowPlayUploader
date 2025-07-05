@@ -107,7 +107,7 @@ Built for creators who want to:
 
 ---
 
-## Repository Activity Graph
+## Activity Graph
 
 ![GitHub Activity Graph](https://github-readme-activity-graph.cyclic.app/graph?username=diluteoxygen&repo=ShadowPlayUploader&theme=github-compact)
 
