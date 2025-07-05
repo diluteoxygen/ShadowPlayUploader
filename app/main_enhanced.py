@@ -56,12 +56,14 @@ class EnhancedShadowPlayUploader:
         
         # Create GUI
         self._create_gui()
-        self._setup_channel_selector()
         self._setup_preset_selector()
         self._setup_queue_display()
         
         # Set up logger
         logger.set_gui_log_box(self.log_box)
+        
+        # Check authentication status
+        self._check_auth_status()
         
         logger.info("Enhanced ShadowPlay Uploader started")
     
@@ -71,7 +73,39 @@ class EnhancedShadowPlayUploader:
         main_frame = ttkb.Frame(self.app, padding=10)
         main_frame.pack(fill=BOTH, expand=True)
         
-        # Top section - Folder and Channel selection
+        # Authentication section
+        auth_frame = ttkb.LabelFrame(main_frame, text="🔐 Authentication & Channel", padding=10)
+        auth_frame.pack(fill=X, pady=(0, 10))
+        
+        # Authentication status and login
+        auth_status_frame = ttkb.Frame(auth_frame)
+        auth_status_frame.pack(fill=X, pady=(0, 10))
+        
+        # Status label
+        self.auth_status_var = ttkb.StringVar(value="Not authenticated")
+        self.auth_status_label = ttkb.Label(auth_status_frame, textvariable=self.auth_status_var, 
+                                           font=("Segoe UI", 9))
+        self.auth_status_label.pack(side=LEFT, padx=(0, 10))
+        
+        # Login/Logout button
+        self.auth_btn = ttkb.Button(auth_status_frame, text="🔑 Login", bootstyle=SUCCESS, 
+                                   command=self._authenticate_user)
+        self.auth_btn.pack(side=LEFT, padx=(0, 10))
+        
+        # Refresh channels button
+        self.refresh_btn = ttkb.Button(auth_status_frame, text="🔄 Refresh Channels", bootstyle=INFO, 
+                                     command=self._refresh_channels, state=DISABLED)
+        self.refresh_btn.pack(side=LEFT)
+        
+        # Channel selector
+        channel_frame = ttkb.Frame(auth_frame)
+        channel_frame.pack(fill=X, pady=(0, 10))
+        
+        ttkb.Label(channel_frame, text="YouTube Channel:").pack(anchor=W)
+        self.channel_combobox = ttkb.Combobox(channel_frame, textvariable=self.channel_var, state="readonly")
+        self.channel_combobox.pack(fill=X, pady=2)
+        
+        # Top section - Folder and Preset selection
         top_frame = ttkb.LabelFrame(main_frame, text="Upload Configuration", padding=10)
         top_frame.pack(fill=X, pady=(0, 10))
         
@@ -90,21 +124,9 @@ class EnhancedShadowPlayUploader:
         ttkb.Button(folder_input_frame, text="Browse", bootstyle=SECONDARY, 
                    command=self._browse_folder).pack(side=LEFT, padx=(0, 10))
         
-        # Channel and Preset selection
-        config_frame = ttkb.Frame(top_frame)
-        config_frame.pack(fill=X, pady=(0, 10))
-        
-        # Channel selector
-        channel_frame = ttkb.Frame(config_frame)
-        channel_frame.pack(side=LEFT, fill=X, expand=True, padx=(0, 10))
-        
-        ttkb.Label(channel_frame, text="YouTube Channel:").pack(anchor=W)
-        self.channel_combobox = ttkb.Combobox(channel_frame, textvariable=self.channel_var, state="readonly")
-        self.channel_combobox.pack(fill=X, pady=2)
-        
-        # Preset selector
-        preset_frame = ttkb.Frame(config_frame)
-        preset_frame.pack(side=LEFT, fill=X, expand=True)
+        # Preset selection
+        preset_frame = ttkb.Frame(top_frame)
+        preset_frame.pack(fill=X, pady=(0, 10))
         
         ttkb.Label(preset_frame, text="Upload Preset:").pack(anchor=W)
         self.preset_combobox = ttkb.Combobox(preset_frame, textvariable=self.preset_var, state="readonly")
@@ -223,32 +245,39 @@ class EnhancedShadowPlayUploader:
     def _setup_channel_selector(self):
         """Set up the channel selector combobox."""
         try:
-            # Discover channels if none exist
-            if not self.channel_manager.get_all_channels():
-                logger.info("No channels found, discovering available channels...")
-                channels = self.channel_manager.discover_channels()
-                if channels:
-                    # Set first channel as active
-                    self.channel_manager.set_active_channel(channels[0].channel_id)
-            
-            # Populate combobox
+            # Get available channels
             channels = self.channel_manager.get_all_channels()
-            channel_names = [f"{ch.channel_title} ({ch.channel_id})" for ch in channels]
             
-            self.channel_combobox['values'] = channel_names
-            
-            # Set active channel
-            active_channel = self.channel_manager.get_active_channel()
-            if active_channel:
-                active_name = f"{active_channel.channel_title} ({active_channel.channel_id})"
-                self.channel_var.set(active_name)
-            
-            # Bind selection change
-            self.channel_combobox.bind('<<ComboboxSelected>>', self._on_channel_changed)
+            if channels:
+                # Populate combobox
+                channel_names = [f"{ch.channel_title} ({ch.channel_id})" for ch in channels]
+                self.channel_combobox['values'] = channel_names
+                
+                # Set active channel
+                active_channel = self.channel_manager.get_active_channel()
+                if active_channel:
+                    active_name = f"{active_channel.channel_title} ({active_channel.channel_id})"
+                    self.channel_var.set(active_name)
+                elif channels:
+                    # Set first channel as active if none selected
+                    self.channel_manager.set_active_channel(channels[0].channel_id)
+                    first_name = f"{channels[0].channel_title} ({channels[0].channel_id})"
+                    self.channel_var.set(first_name)
+                
+                # Bind selection change
+                self.channel_combobox.bind('<<ComboboxSelected>>', self._on_channel_changed)
+                
+                logger.info(f"Channel selector set up with {len(channels)} channels")
+            else:
+                # No channels available
+                self.channel_combobox['values'] = []
+                self.channel_var.set("")
+                logger.info("No channels available for selection")
             
         except Exception as e:
             logger.error(f"Failed to setup channel selector: {e}")
-            messagebox.showerror("Error", f"Failed to load channels: {e}")
+            self.channel_combobox['values'] = []
+            self.channel_var.set("")
     
     def _setup_preset_selector(self):
         """Set up the preset selector combobox."""
@@ -457,6 +486,152 @@ class EnhancedShadowPlayUploader:
     def _on_upload_error(self, upload_item: UploadItem, error: Exception):
         """Handle upload errors."""
         logger.error(f"Upload failed: {upload_item.file_name} - {error}")
+    
+    def _check_auth_status(self):
+        """Check if user is authenticated and update UI accordingly."""
+        try:
+            # Check if we have any channels (indicates authentication)
+            channels = self.channel_manager.get_all_channels()
+            if channels:
+                # User is authenticated
+                self.auth_status_var.set("✅ Authenticated")
+                self.auth_btn.config(text="🔓 Logout", bootstyle=DANGER)
+                self.refresh_btn.config(state=NORMAL)
+                self._setup_channel_selector()
+                logger.info("User is authenticated")
+            else:
+                # User is not authenticated
+                self.auth_status_var.set("❌ Not authenticated")
+                self.auth_btn.config(text="🔑 Login", bootstyle=SUCCESS)
+                self.refresh_btn.config(state=DISABLED)
+                self.channel_combobox['values'] = []
+                self.channel_var.set("")
+                logger.info("User is not authenticated")
+        except Exception as e:
+            logger.error(f"Error checking auth status: {e}")
+            self.auth_status_var.set("❌ Authentication error")
+    
+    def _authenticate_user(self):
+        """Handle user authentication/login."""
+        try:
+            if self.auth_btn.cget("text") == "🔑 Login":
+                # User wants to login
+                logger.info("Starting authentication process...")
+                self.auth_status_var.set("🔄 Authenticating...")
+                self.auth_btn.config(state=DISABLED)
+                
+                # Start authentication in a separate thread
+                def auth_thread():
+                    try:
+                        # Try to discover channels (this will trigger OAuth if needed)
+                        channels = self.channel_manager.discover_channels()
+                        if channels:
+                            # Authentication successful
+                            self.app.after(0, lambda: self._auth_success(channels))
+                        else:
+                            # Authentication failed
+                            self.app.after(0, lambda: self._auth_failed("No channels found"))
+                    except Exception as auth_error:
+                        self.app.after(0, lambda err=auth_error: self._auth_failed(str(err)))
+                
+                threading.Thread(target=auth_thread, daemon=True).start()
+                
+            else:
+                # User wants to logout
+                self._logout_user()
+                
+        except Exception as e:
+            logger.error(f"Authentication error: {e}")
+            self._auth_failed(str(e))
+    
+    def _auth_success(self, channels):
+        """Handle successful authentication."""
+        try:
+            self.auth_status_var.set("✅ Authenticated")
+            self.auth_btn.config(text="🔓 Logout", bootstyle=DANGER, state=NORMAL)
+            self.refresh_btn.config(state=NORMAL)
+            
+            # Set up channel selector
+            self._setup_channel_selector()
+            
+            # Set first channel as active if none selected
+            if not self.channel_var.get() and channels:
+                first_channel = channels[0]
+                self.channel_manager.set_active_channel(first_channel.channel_id)
+                channel_name = f"{first_channel.channel_title} ({first_channel.channel_id})"
+                self.channel_var.set(channel_name)
+            
+            logger.info(f"Authentication successful. Found {len(channels)} channels.")
+            messagebox.showinfo("Success", f"Authentication successful!\nFound {len(channels)} YouTube channel(s).")
+            
+        except Exception as e:
+            logger.error(f"Error in auth success: {e}")
+            self._auth_failed(str(e))
+    
+    def _auth_failed(self, error_msg):
+        """Handle failed authentication."""
+        self.auth_status_var.set("❌ Authentication failed")
+        self.auth_btn.config(text="🔑 Login", bootstyle=SUCCESS, state=NORMAL)
+        self.refresh_btn.config(state=DISABLED)
+        logger.error(f"Authentication failed: {error_msg}")
+        messagebox.showerror("Authentication Failed", f"Failed to authenticate:\n{error_msg}")
+    
+    def _logout_user(self):
+        """Handle user logout."""
+        try:
+            # Clear channels
+            self.channel_manager.channels.clear()
+            self.channel_manager.channel_settings.clear()
+            self.channel_manager.active_channel_id = None
+            
+            # Update UI
+            self.auth_status_var.set("❌ Not authenticated")
+            self.auth_btn.config(text="🔑 Login", bootstyle=SUCCESS)
+            self.refresh_btn.config(state=DISABLED)
+            self.channel_combobox['values'] = []
+            self.channel_var.set("")
+            
+            logger.info("User logged out")
+            messagebox.showinfo("Logged Out", "Successfully logged out.")
+            
+        except Exception as e:
+            logger.error(f"Error during logout: {e}")
+    
+    def _refresh_channels(self):
+        """Refresh the list of available channels."""
+        try:
+            logger.info("Refreshing channels...")
+            self.refresh_btn.config(state=DISABLED)
+            
+            def refresh_thread():
+                try:
+                    channels = self.channel_manager.discover_channels()
+                    self.app.after(0, lambda: self._refresh_success(channels))
+                except Exception as refresh_error:
+                    self.app.after(0, lambda err=refresh_error: self._refresh_failed(str(err)))
+            
+            threading.Thread(target=refresh_thread, daemon=True).start()
+            
+        except Exception as e:
+            logger.error(f"Error refreshing channels: {e}")
+            self.refresh_btn.config(state=NORMAL)
+    
+    def _refresh_success(self, channels):
+        """Handle successful channel refresh."""
+        try:
+            self._setup_channel_selector()
+            self.refresh_btn.config(state=NORMAL)
+            logger.info(f"Refreshed {len(channels)} channels")
+            messagebox.showinfo("Success", f"Refreshed {len(channels)} channels.")
+        except Exception as e:
+            logger.error(f"Error in refresh success: {e}")
+            self.refresh_btn.config(state=NORMAL)
+    
+    def _refresh_failed(self, error_msg):
+        """Handle failed channel refresh."""
+        self.refresh_btn.config(state=NORMAL)
+        logger.error(f"Channel refresh failed: {error_msg}")
+        messagebox.showerror("Refresh Failed", f"Failed to refresh channels:\n{error_msg}")
     
     def run(self):
         """Run the application."""

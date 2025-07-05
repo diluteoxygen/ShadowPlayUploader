@@ -29,3 +29,6 @@ Thumbs.db
 
 # Archive (optional, if you want to keep it local only)
 archive/
+
+#Uploaded files
+/Uploaded

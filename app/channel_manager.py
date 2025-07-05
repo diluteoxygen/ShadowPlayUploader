@@ -70,14 +70,17 @@ class ChannelSettings:
 class ChannelManager:
     """Manages multiple YouTube channels and their settings."""
     
-    def __init__(self, client_secrets_file: str = "client_secrets.json"):
+    def __init__(self, client_secrets_file: str = None):
         """
         Initialize the channel manager.
         
         Args:
-            client_secrets_file: Path to the client secrets file
+            client_secrets_file: Path to the client secrets file (uses config if None)
         """
-        self.client_secrets_file = client_secrets_file
+        if client_secrets_file is None:
+            self.client_secrets_file = config.get("api.client_secrets_file")
+        else:
+            self.client_secrets_file = client_secrets_file
         self.channels: Dict[str, ChannelInfo] = {}
         self.channel_settings: Dict[str, ChannelSettings] = {}
         self.active_channel_id: Optional[str] = None
@@ -163,8 +166,8 @@ class ChannelManager:
             List of available channels
         """
         try:
-            # Get authenticated service
-            youtube = self._get_authenticated_service()
+            # Use a simple authentication approach that doesn't require a pre-selected channel
+            youtube = self._authenticate_and_get_service()
             
             # Get channels
             response = youtube.channels().list(
@@ -263,6 +266,54 @@ class ChannelManager:
             return self.channel_settings.get(self.active_channel_id)
         return None
     
+    def _authenticate_and_get_service(self):
+        """Get authenticated YouTube service without requiring a pre-selected channel."""
+        try:
+            # Use the main token file for initial authentication
+            token_file = config.get("api.token_file")
+            creds = None
+            
+            if os.path.exists(token_file):
+                try:
+                    with open(token_file, 'rb') as token:
+                        creds = pickle.load(token)
+                    logger.debug("Loaded existing credentials from main token file")
+                except Exception as e:
+                    logger.warning(f"Failed to load existing token: {e}")
+                    creds = None
+
+            # Refresh or authenticate
+            if not creds or not creds.valid:
+                if creds and creds.expired and creds.refresh_token:
+                    try:
+                        logger.info("Refreshing expired credentials")
+                        creds.refresh(Request())
+                    except RefreshError:
+                        logger.warning("Failed to refresh credentials, re-authenticating")
+                        creds = None
+                
+                if not creds:
+                    # Start OAuth flow
+                    logger.info("Starting OAuth flow for channel discovery")
+                    scopes = config.get("api.scopes")
+                    flow = InstalledAppFlow.from_client_secrets_file(self.client_secrets_file, scopes)
+                    creds = flow.run_local_server(port=0)
+                    logger.info("OAuth authentication completed")
+                
+                # Save credentials
+                try:
+                    with open(token_file, 'wb') as token:
+                        pickle.dump(creds, token)
+                    logger.info("Credentials saved successfully")
+                except Exception as e:
+                    logger.error(f"Failed to save credentials: {e}")
+
+            return build("youtube", "v3", credentials=creds)
+            
+        except Exception as e:
+            logger.error(f"Authentication failed: {e}")
+            raise AuthenticationError(f"Failed to authenticate: {e}")
+
     def _get_authenticated_service(self, channel_id: Optional[str] = None):
         """Get authenticated YouTube service for a specific channel."""
         try:

@@ -33,7 +33,7 @@
       "https://www.googleapis.com/auth/youtube.readonly"
     ],
     "token_file": "token.pickle",
-    "client_secrets_file": "client_secrets.json"
+    "client_secrets_file": "resources/client_secrets.json"
   },
   "paths": {
     "hash_log": "uploaded_hashes.txt",
