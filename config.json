@@ -1,0 +1,42 @@
+{
+  "ui": {
+    "theme": "flatly",
+    "dark_mode": false,
+    "window_width": 720,
+    "window_height": 640,
+    "auto_delete": true
+  },
+  "upload": {
+    "privacy_status": "unlisted",
+    "category_id": "20",
+    "description_template": "Auto-uploaded ShadowPlay clip",
+    "chunk_size_mb": 1,
+    "max_retries": 3,
+    "retry_delay": 2
+  },
+  "file_management": {
+    "move_instead_of_delete": false,
+    "uploaded_folder": "uploaded",
+    "archive_old_files": false,
+    "min_file_size_mb": 0,
+    "max_file_size_mb": 0
+  },
+  "logging": {
+    "log_level": "INFO",
+    "max_log_size_mb": 1,
+    "backup_count": 5,
+    "log_file": "app.log"
+  },
+  "api": {
+    "scopes": [
+      "https://www.googleapis.com/auth/youtube.upload",
+      "https://www.googleapis.com/auth/youtube.readonly"
+    ],
+    "token_file": "token.pickle",
+    "client_secrets_file": "resources/client_secrets.json"
+  },
+  "paths": {
+    "hash_log": "uploaded_hashes.txt",
+    "config_file": "resources/config.json"
+  }
+}

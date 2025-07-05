@@ -1,0 +1,41 @@
+{
+  "Simple": {
+    "name": "Simple",
+    "template": "Auto-uploaded ShadowPlay clip",
+    "description": "Simple template with no variables",
+    "variables": [],
+    "created_at": "2025-07-05T15:50:00.624193"
+  },
+  "Detailed": {
+    "name": "Detailed",
+    "template": "ShadowPlay clip: {filename}\n\nRecorded on {date}\nFile size: {filesize_mb:.1f} MB",
+    "description": "Detailed template with filename, date, and file size",
+    "variables": [
+      "date",
+      "filename"
+    ],
+    "created_at": "2025-07-05T15:50:00.625202"
+  },
+  "Gaming": {
+    "name": "Gaming",
+    "template": "Gaming clip: {filename}\n\nRecorded with NVIDIA ShadowPlay\nGame: {game_name}\nDuration: {duration}",
+    "description": "Gaming-focused template with game name and duration",
+    "variables": [
+      "game_name",
+      "filename",
+      "duration"
+    ],
+    "created_at": "2025-07-05T15:50:00.625202"
+  },
+  "Archive": {
+    "name": "Archive",
+    "template": "Archived ShadowPlay clip\n\nFilename: {filename}\nDate: {date}\nSize: {filesize_mb:.1f} MB\nHash: {file_hash}",
+    "description": "Archive template with detailed file information",
+    "variables": [
+      "date",
+      "filename",
+      "file_hash"
+    ],
+    "created_at": "2025-07-05T15:50:00.625202"
+  }
+}

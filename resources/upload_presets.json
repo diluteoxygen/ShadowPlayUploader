@@ -1,0 +1,87 @@
+{
+  "Default": {
+    "name": "Default",
+    "description": "Default upload settings",
+    "privacy_status": "unlisted",
+    "category_id": "20",
+    "description_template": "Auto-uploaded ShadowPlay clip",
+    "tags": [
+      "gaming",
+      "shadowplay"
+    ],
+    "playlist_id": null,
+    "auto_delete": true,
+    "move_instead_of_delete": false,
+    "uploaded_folder": "uploaded",
+    "chunk_size_mb": 1,
+    "max_retries": 3,
+    "retry_delay": 2,
+    "created_at": "2025-07-05T15:50:00.621689",
+    "updated_at": "2025-07-05T15:50:00.621689",
+    "is_default": true
+  },
+  "Private Archive": {
+    "name": "Private Archive",
+    "description": "Upload videos as private for archiving",
+    "privacy_status": "private",
+    "category_id": "20",
+    "description_template": "Archived ShadowPlay clip - {filename}",
+    "tags": [
+      "archive",
+      "gaming"
+    ],
+    "playlist_id": null,
+    "auto_delete": false,
+    "move_instead_of_delete": true,
+    "uploaded_folder": "archived",
+    "chunk_size_mb": 1,
+    "max_retries": 3,
+    "retry_delay": 2,
+    "created_at": "2025-07-05T15:50:00.621689",
+    "updated_at": "2025-07-05T15:50:00.621689",
+    "is_default": false
+  },
+  "Public Gaming": {
+    "name": "Public Gaming",
+    "description": "Upload gaming videos as public",
+    "privacy_status": "public",
+    "category_id": "20",
+    "description_template": "Gaming clip: {filename}\n\nRecorded with NVIDIA ShadowPlay",
+    "tags": [
+      "gaming",
+      "gameplay",
+      "shadowplay"
+    ],
+    "playlist_id": null,
+    "auto_delete": true,
+    "move_instead_of_delete": false,
+    "uploaded_folder": "uploaded",
+    "chunk_size_mb": 1,
+    "max_retries": 3,
+    "retry_delay": 2,
+    "created_at": "2025-07-05T15:50:00.621689",
+    "updated_at": "2025-07-05T15:50:00.621689",
+    "is_default": false
+  },
+  "High Quality": {
+    "name": "High Quality",
+    "description": "High quality uploads with larger chunk size",
+    "privacy_status": "unlisted",
+    "category_id": "20",
+    "description_template": "High quality ShadowPlay clip",
+    "tags": [
+      "gaming",
+      "hq"
+    ],
+    "playlist_id": null,
+    "auto_delete": true,
+    "move_instead_of_delete": false,
+    "uploaded_folder": "uploaded",
+    "chunk_size_mb": 5,
+    "max_retries": 5,
+    "retry_delay": 3,
+    "created_at": "2025-07-05T15:50:00.621689",
+    "updated_at": "2025-07-05T15:50:00.621689",
+    "is_default": false
+  }
+}
